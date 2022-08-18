@@ -1,6 +1,11 @@
 import {types, getEnv, applySnapshot, getSnapshot} from 'mobx-state-tree';
 import {PageStore} from './Page';
 import {when, reaction} from 'mobx';
+import axios from 'axios';
+
+let appInfo = JSON.parse(window.localStorage.getItem('app') || '{}');
+let backContextPath = appInfo.backContextPath;
+axios.defaults.baseURL = backContextPath;
 let pagIndex = 1;
 export const MainStore = types
   .model('MainStore', {
@@ -17,6 +22,8 @@ export const MainStore = types
         }
       }
     ]),
+    backPaths: types.frozen([]),
+    backPages: types.frozen([]),
     theme: 'cxd',
     asideFixed: true,
     asideFolded: false,
@@ -57,16 +64,16 @@ export const MainStore = types
       self.addPageIsOpen = isOpened;
     }
 
-    function addPage(data: {
-      label: string;
-      path: string;
-      icon?: string;
-      schema?: any;
-    }) {
+    function initPages(data: any) {
+      self.backPages = data;
+    }
+
+    function addPage(data: {id: string, label: string; path: string; icon?: string; schema?: any}) {
       self.pages.push(
         PageStore.create({
           ...data,
-          id: `${++pagIndex}`
+          // id: `${++pagIndex}`
+          id: data.id
         })
       );
     }
@@ -76,7 +83,16 @@ export const MainStore = types
     }
 
     function updatePageSchemaAt(index: number) {
-      self.pages[index].updateSchema(self.schema);
+
+      let page = self.pages[index];
+      let schema = {
+        type: 'page',
+        body: page.schema
+      };
+      // console.info("保存",page,JSON.stringify(page.schema) )
+      axios.post('/backend/magic_amis_page/update', {id: page.id, schema: JSON.stringify(schema)}).then((res) => {
+      });
+      page.updateSchema(self.schema);
     }
 
     function updateSchema(value: any) {
@@ -102,19 +118,51 @@ export const MainStore = types
       updateSchema,
       setPreview,
       setIsMobile,
+      initPages,
       afterCreate() {
-        // persist store
-        if (typeof window !== 'undefined' && window.localStorage) {
-          const storeData = window.localStorage.getItem('store');
-          if (storeData) applySnapshot(self, JSON.parse(storeData));
+        (async function() {
 
-          reaction(
-            () => getSnapshot(self),
-            json => {
-              window.localStorage.setItem('store', JSON.stringify(json));
-            }
-          );
-        }
+          let data = await axios.get('/backend/magic_amis_page/search_menu_tree');
+          let menuInfo = data.data.data;
+          let pathResult = await axios.get('/backend/magic_amis_page/search_all_path');
+          let path = pathResult.data.data;
+          let pageData: any[] = [];
+          const paths = path.map(item => {
+            let info = {
+              label: item.title,
+              icon: item.icon || '',
+              path: `/${item.href}`,
+              id: item.id
+            };
+            pageData.push(PageStore.create({
+              ...info,
+              schema: JSON.parse(item.pageContent)
+            }));
+            return `/${item.href}`;
+          });
+
+          applySnapshot(self, {...self, ...{backPages: menuInfo, backPaths: paths, pages: pageData}});
+          console.info(self);
+          // applySnapshot(self,menuInfo);
+
+
+          // store.initPages();
+        })();
+
+
+        // // persist store
+        // if (typeof window !== 'undefined' && window.localStorage) {
+        //     const storeData = window.localStorage.getItem('store');
+        //     console.info(JSON.parse(storeData));
+        //     if (storeData) applySnapshot(self, JSON.parse(storeData));
+        //     reaction(
+        //         () => getSnapshot(self),
+        //         json => {
+        //             console.log(json);
+        //             window.localStorage.setItem('store', JSON.stringify(json));
+        //         }
+        //     );
+        // }
       }
     };
   });

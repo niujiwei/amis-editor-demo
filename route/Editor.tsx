@@ -79,6 +79,11 @@ export default inject('store')(
 
           <div className="Editor-header-actions">
             <ShortcutKey />
+            <div  className={`header-action-btn margin-left-space ${
+              store.preview ? 'primary' : ''
+            }`} onClick={save}>
+              保存
+            </div>
             <div
               className={`header-action-btn margin-left-space ${
                 store.preview ? 'primary' : ''

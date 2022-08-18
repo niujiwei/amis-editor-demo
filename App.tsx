@@ -6,15 +6,18 @@ import {MainStore} from './store/index';
 import RootRoute from './route/index';
 import copy from 'copy-to-clipboard';
 
-export default function (): JSX.Element {
+export default function(): JSX.Element {
   const store = ((window as any).store = MainStore.create(
     {},
     {
-      fetcher: ({url, method, data, config, headers}: any) => {
+      fetcher: ({url, method, data, config}: any) => {
+        let appInfo = JSON.parse(window.localStorage.getItem('app'));
+        let backContextPath = appInfo.backContextPath;
+        url = url.startsWith('/') ?   url : '/'  + url;
+        console.info(url)
         config = config || {};
-        config.headers = config.headers || headers || {};
+        config.headers = config.headers || {};
         config.withCredentials = true;
-
         if (method !== 'post' && method !== 'put' && method !== 'patch') {
           if (data) {
             config.params = data;
@@ -46,9 +49,7 @@ export default function (): JSX.Element {
       confirm,
       copy: (contents: string, options: any = {}) => {
         const ret = copy(contents, options);
-        ret &&
-          (!options || options.shutup !== true) &&
-          toast.info('内容已拷贝到剪切板');
+        ret && (!options || options.shutup !== true) && toast.info('内容已拷贝到剪切板');
         return ret;
       }
     }
