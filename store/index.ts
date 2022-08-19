@@ -2,6 +2,7 @@ import {types, getEnv, applySnapshot, getSnapshot} from 'mobx-state-tree';
 import {PageStore} from './Page';
 import {when, reaction} from 'mobx';
 import axios from 'axios';
+import {toast} from 'amis';
 
 let appInfo = JSON.parse(window.localStorage.getItem('app') || '{}');
 let backContextPath = appInfo.backContextPath;
@@ -85,17 +86,28 @@ export const MainStore = types
     function updatePageSchemaAt(index: number) {
 
       let page = self.pages[index];
-      let schema = {
-        type: 'page',
-        body: page.schema
-      };
-      // console.info("保存",page,JSON.stringify(page.schema) )
-      axios.post('/backend/magic_amis_page/update', {id: page.id, schema: JSON.stringify(schema)}).then((res) => {
-      });
       page.updateSchema(self.schema);
+      // console.info("保存",page,JSON.stringify(page.schema) )
+      axios.post('/backend/magic_amis_page/update', {
+        id: page.id,
+        label: page.label,
+        path: page.path,
+        schema: JSON.stringify(page.schema)
+      }).then((data) => {
+        if(data.data==0){
+          return toast.error('保存失败', '提示');
+        }
+        toast.success('保存成功', '提示');
+      }).catch((res) => {
+        toast.error('保存失败', '提示');
+        console.error(res);
+
+      });
+
     }
 
     function updateSchema(value: any) {
+      console.info('更新', value);
       self.schema = value;
     }
 
@@ -127,6 +139,7 @@ export const MainStore = types
           let pathResult = await axios.get('/backend/magic_amis_page/search_all_path');
           let path = pathResult.data.data;
           let pageData: any[] = [];
+
           const paths = path.map(item => {
             let info = {
               label: item.title,
@@ -134,6 +147,10 @@ export const MainStore = types
               path: `/${item.href}`,
               id: item.id
             };
+            if (item.id == '100-00007') {
+              console.info('1007', item.pageContent);
+            }
+
             pageData.push(PageStore.create({
               ...info,
               schema: JSON.parse(item.pageContent)
@@ -142,7 +159,6 @@ export const MainStore = types
           });
 
           applySnapshot(self, {...self, ...{backPages: menuInfo, backPaths: paths, pages: pageData}});
-          console.info(self);
           // applySnapshot(self,menuInfo);
 
 

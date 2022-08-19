@@ -11,18 +11,30 @@ export default function(): JSX.Element {
     {},
     {
       fetcher: ({url, method, data, config}: any) => {
+
         let appInfo = JSON.parse(window.localStorage.getItem('app'));
         let backContextPath = appInfo.backContextPath;
-        url = url.startsWith('/') ?   url : '/'  + url;
-        console.info(url)
+        let successErrCode = appInfo.successErrCode;
+        url = url.startsWith('/') ? url : '/' + url;
+        console.info(url);
         config = config || {};
         config.headers = config.headers || {};
         config.withCredentials = true;
+        console.info(url);
         if (method !== 'post' && method !== 'put' && method !== 'patch') {
           if (data) {
             config.params = data;
           }
-          return (axios as any)[method](url, config);
+          return (axios as any)[method](url, config).then(function (res) {
+            var data = res.data;
+            return {
+              data: {
+                "status":  (data.errcode === successErrCode) ? 0 : (data.errcode===0?-1:data.errcode),
+                "msg": data.errmsg,
+                "data": data.data // 不能为空
+              }
+            }
+          });
         } else if (data && data instanceof FormData) {
           // config.headers = config.headers || {};
           // config.headers['Content-Type'] = 'multipart/form-data';
@@ -36,7 +48,19 @@ export default function(): JSX.Element {
           config.headers['Content-Type'] = 'application/json';
         }
 
-        return (axios as any)[method](url, data, config);
+        return (axios as any)[method](url, data, config).then(function(res: any) {
+          console.info('请求结果{}', res);
+          var data = res.data;
+          return {
+            data: {//处理返回结果
+              'status': (data.errcode === successErrCode) ? 0 : (data.errcode === 0 ? -1 : data.errcode),
+              'msg': data.errmsg,
+              'data': data.data // 不能为空
+            }
+          };
+        }).catch(function(res: any) {
+          console.info('异常响应结果', res);
+        });
       },
       isCancel: (e: any) => axios.isCancel(e),
       notify: (type: 'success' | 'error' | 'info', msg: string) => {
